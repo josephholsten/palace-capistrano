@@ -43,7 +43,7 @@ set :wordpress_db_password, "ieBu9EgnRA"
 set :wordpress_db_host, "localhost"
 
 # WordPress path. Unless set here, these variables *WILL NOT* be set in wp-config.php
-set :wordpress_home, "http://palacetulsa.josephholsten.com"
+set :wordpress_home, "http://palacetest.josephholsten.com"
 set :wordpress_siteurl, "http://palacetest.josephholsten.com"
 
 #these are randomized on `cap setup:wordpress`
