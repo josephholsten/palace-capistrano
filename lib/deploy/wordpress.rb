@@ -3,9 +3,9 @@ require 'digest'
 require 'digest/sha1'
 Capistrano::Configuration.instance.load do
   default_run_options[:pty] = true
-  set :deploy_to, "/var/www/apps/#{application}"
+  set :deploy_to, "#{deploy_base}/#{application}"
   set :scm, "git"
-  set :user, "wordpress"
+  set :user, acting_user
   set :admin_runner, user
   set :runner, user
   set :deploy_via, :remote_cache
@@ -14,7 +14,7 @@ Capistrano::Configuration.instance.load do
   set :initial_puppet_tarball_url, "http://github.com/jestro/puppet-lamp/tarball/master"
   set :puppet_git_repo_url, "git://github.com/jestro/puppet-lamp.git"
   set :wordpress_db_host, "localhost"
-  set :wordpress_svn_url, "http://svn.automattic.com/wordpress/tags/2.7"
+  set :wordpress_svn_url, "http://svn.automattic.com/wordpress/tags/#{wordpress_tag}"
   set :wordpress_auth_key, Digest::SHA1.hexdigest(rand.to_s)
   set :wordpress_secure_auth_key, Digest::SHA1.hexdigest(rand.to_s)
   set :wordpress_logged_in_key, Digest::SHA1.hexdigest(rand.to_s)
@@ -58,12 +58,12 @@ Capistrano::Configuration.instance.load do
 
       run <<-CMD
         mkdir -p #{latest_release}/finalized &&
-        cp -rv   #{shared_path}/wordpress/*     #{latest_release}/finalized/ &&
-        cp -rv   #{shared_path}/wp-config.php   #{latest_release}/finalized/wp-config.php &&
+        cp -r    #{shared_path}/wordpress/*     #{latest_release}/finalized/ &&
+        cp -r    #{shared_path}/wp-config.php   #{latest_release}/finalized/wp-config.php &&
         rm -rf   #{latest_release}/finalized/wp-content &&
         mkdir    #{latest_release}/finalized/wp-content &&
-        cp -rv   #{latest_release}/themes       #{latest_release}/finalized/wp-content/ &&
-        cp -rv   #{latest_release}/plugins      #{latest_release}/finalized/wp-content/
+        cp -r    #{latest_release}/themes       #{latest_release}/finalized/wp-content/ &&
+        cp -r    #{latest_release}/plugins      #{latest_release}/finalized/wp-content/
       CMD
     end
 
@@ -93,12 +93,12 @@ Capistrano::Configuration.instance.load do
 
     desc "Setup this server for a new wordpress site."
     task :wordpress do
-      sudo "mkdir -p /var/www/apps"
-      sudo "chown -R wordpress /var/www/apps"
+      try_sudo "mkdir -p #{deploy_base}"
+      try_sudo "chown -R #{user} #{deploy_base}"
       deploy.setup
-      mysql.create_databases
+      # mysql.create_databases
       wp.config
-      apache.configure
+      # apache.configure
       wp.checkout
     end
 
@@ -109,9 +109,9 @@ Capistrano::Configuration.instance.load do
     task :users do
       set :user, 'root'
       run "groupadd -f wheel"
-      run "useradd -g wheel wordpress || echo"
+      run "useradd -g wheel #{acting_user} || echo"
       reset_password
-      set :password_user, 'wordpress'
+      set :password_user, acting_user
       reset_password
     end
 
@@ -122,12 +122,12 @@ Capistrano::Configuration.instance.load do
     end
 
     task :generate_ssh_keys do
-      run "#{try_sudo} mkdir -p /home/wordpress/.ssh"
-      run "#{try_sudo} chmod 700 /home/wordpress/.ssh"
-      run "if [ -f /home/wordpress/.ssh/id_rsa ]; then echo 'SSH key already exists'; else #{try_sudo} ssh-keygen -q -f /home/wordpress/.ssh/id_rsa -N ''; fi"
-      pubkey = capture("cat /home/wordpress/.ssh/id_rsa.pub")
+      run "#{try_sudo} mkdir -p /home/#{acting_user}/.ssh"
+      run "#{try_sudo} chmod 700 /home/#{acting_user}/.ssh"
+      run "if [ -f /home/#{acting_user}/.ssh/id_rsa ]; then echo 'SSH key already exists'; else #{try_sudo} ssh-keygen -q -f /home/#{acting_user}/.ssh/id_rsa -N ''; fi"
+      pubkey = capture("cat /home/#{acting_user}/.ssh/id_rsa.pub")
       puts "Below is the SSH public key for your server."
-      puts "Please add this key to your account on GitHub."
+      puts "Please add this key to your account on your git server."
       puts ""
       puts pubkey
       puts ""
@@ -226,7 +226,7 @@ Capistrano::Configuration.instance.load do
       buffer = ERB.new(template).result(binding)
 
       put buffer, "#{shared_path}/wp-config.php"
-      puts "New wp-config.php uploaded! Please run cap:deploy to activate these changes."
+      puts "New wp-config.php uploaded! Please run cap deploy to activate these changes."
     end
 
   end
