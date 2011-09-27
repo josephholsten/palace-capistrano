@@ -1,0 +1,3 @@
+[submodule "themes/palace_theme"]
+	path = themes/palace_theme
+	url = http://github.com/josephholsten/palace_theme.git
